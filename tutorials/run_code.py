@@ -69,10 +69,10 @@ elif track_mode == "tissue":
     frame_num = 0
     method = "minimum"
     
-    ctm.run_create_tissue_mask(input_folder, seg_fcn_num, fname, frame_num, method)
+    # ctm.run_create_tissue_mask(input_folder, seg_fcn_num, fname, frame_num, method)
     
     # run the tracking
-    ia.run_tracking(input_folder,fps,ls)
+    # ia.run_tracking(input_folder,fps,ls)
 
     # # run the tracking visualization
     automatic_color_constraint = True # Put False if manual limits are to be specified
@@ -83,15 +83,19 @@ elif track_mode == "tissue":
     col_min_col = -2
     col_max_col = 2
     col_map = plt.cm.viridis
-    ia.run_visualization(input_folder, automatic_color_constraint, col_min_abs, col_max_abs, col_min_row, col_max_row, col_min_col, col_max_col, col_map)
+    # ia.run_visualization(input_folder, automatic_color_constraint, col_min_abs, col_max_abs, col_min_row, col_max_row, col_min_col, col_max_col, col_map)
     
     # rotate and interpolate tracking results
     # rotate the results
     input_mask = True  # this will use the mask to determine the rotation vector.
-    ia.run_rotation(input_folder, input_mask)
+    # ia.run_rotation(input_folder, input_mask)
     
-    ia.run_rotation_visualization(input_folder, automatic_color_constraint, col_min_abs, col_max_abs, col_min_row, col_max_row, col_min_col, col_max_col, col_map)
+    # ia.run_rotation_visualization(input_folder, automatic_color_constraint, col_min_abs, col_max_abs, col_min_row, col_max_row, col_min_col, col_max_col, col_map)
 
+    pillar_clip_fraction = 0.5
+    clip_columns = True
+    clip_rows = False
+    shrink_row = 0.1
     shrink_col = 0.1
     tile_dim_pix = 40
     num_tile_row = 3
@@ -99,13 +103,13 @@ elif track_mode == "tissue":
     tile_style = 1 # or 2
     manual_sub = False # or True
     sub_extents = None # if manual_sub = True provide as [r0,r1,c0,c1]
-    sa.run_sub_domain_strain_analysis(input_folder, pillar_clip_fraction, shrink_row, shrink_col, tile_dim_pix, num_tile_row, num_tile_col, tile_style, is_rotated = True,clip_columns=clip_columns,clip_rows=clip_rows, manual_sub=manual_sub, sub_extents=sub_extents)
+    sa.run_sub_domain_strain_analysis(input_folder, pillar_clip_fraction, shrink_row, shrink_col, tile_dim_pix, num_tile_row, num_tile_col, tile_style, is_rotated = False,clip_columns=clip_columns,clip_rows=clip_rows, manual_sub=manual_sub, sub_extents=sub_extents)
     
     # visualize the strain analysis results
     col_min = -0.025
     col_max = 0.025
     col_map = plt.cm.RdBu
-    sa.visualize_sub_domain_strain(input_folder, automatic_color_constraint, col_min, col_max, col_map, is_rotated = True)    
+    sa.visualize_sub_domain_strain(input_folder, automatic_color_constraint, col_min, col_max, col_map, is_rotated = False)    
 
 else:
     print("track_mode should be either 'pillar' or 'tissue'")

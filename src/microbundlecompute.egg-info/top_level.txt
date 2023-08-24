@@ -1,1 +1,4 @@
 microbundlecompute
+microbundlecompute1
+microbundlecompute2
+microbundlecompute_analytical

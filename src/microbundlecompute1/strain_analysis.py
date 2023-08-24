@@ -396,7 +396,7 @@ def png_sub_domain_strain_timeseries_all(
             for rr in range(0, num_sd_row):
                 lab = get_text_str(rr, cc)
                 idx = rr * num_sd_col + cc
-                ax.plot(sub_domain_strain[idx, :], label=lab, color=col_map(idx/(num_sd_col * num_sd_row)))
+                ax.plot(sub_domain_strain[idx, :-10], label=lab, color=col_map(idx/(num_sd_col * num_sd_row)), vmin = -0.07, vmax = 0.01)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_title("beat %i" % (kk))
@@ -468,7 +468,7 @@ def pngs_sub_domain_strain(
             plt.figure()
             plt.imshow(tiff_list[kk], cmap=plt.cm.gray)
             jj = kk - start_idx
-            plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=E[:, jj], s=50, cmap=col_map, vmin=-0.085, vmax=0.01)
+            plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=E[:, jj], s=50, cmap=col_map, vmin=col_min, vmax=col_max)
             # illustrate sub-domain borders
             sds = sub_domain_side / 2.0
             for ii in range(0, tracker_col.shape[0]):

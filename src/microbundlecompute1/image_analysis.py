@@ -334,14 +334,11 @@ def compute_valleys(timeseries: np.ndarray) -> np.ndarray:
     time_seg_params = get_time_segment_param_dicts()
     time_seg_params = adjust_time_seg_params(time_seg_params, timeseries)
     peaks, _ = find_peaks(timeseries, distance=time_seg_params["peakDist"], prominence=time_seg_params["prom"])
-    print("peaks", peaks)
-    valleys = [0,0]
-    # for kk in range(0, len(peaks) - 1):
-    #     valleys.append(int(0.5 * peaks[kk] + 0.5 * peaks[kk + 1]))
+    valleys = []
+    for kk in range(0, len(peaks) - 1):
+        valleys.append(int(0.5 * peaks[kk] + 0.5 * peaks[kk + 1]))
     info = []
-    for kk in range(0,1):
-        print("kk", kk)
-        print("valleys", valleys[kk], valleys[kk + 1])
+    for kk in range(0, len(valleys) - 1):
         # beat number, start index wrt movie, end index wrt movie
         info.append([kk, valleys[kk], valleys[kk + 1]])
     return np.asarray(info)
@@ -372,9 +369,8 @@ def compute_beat_amplitude(timeseries: np.ndarray, tracker_row_all: List, tracke
     """Given a timeseries and split tracking results. Will compute the amplitude of the beats."""
     all_beat_ampl = []
     num_beats = info.shape[0]
-    print("info shape", num_beats)
     peaks = compute_peaks(timeseries)
-    actual_peaks = peaks
+    actual_peaks = peaks[1:-1]
     for beat in range(0, num_beats):
         tracker_row = tracker_row_all[beat]
         tracker_col = tracker_col_all[beat]
@@ -433,18 +429,11 @@ def save_tracking(*, folder_path: Path, tracker_row_all: List, tracker_col_all: 
     new_path = create_folder(folder_path, "results")
     num_beats = len(tracker_row_all)
     saved_paths = []
-    print(tracker_row_all[0].shape)
-    print("relaxed", tracker_row_all[0][0,0])
-    print("contracted", tracker_row_all[0][0,25])
-    print("relaxed y", tracker_col_all[0][0,0])
-    print("contracted y", tracker_col_all[0][0,25])
     for kk in range(0, num_beats):
         if fname is not None:
             file_path = new_path.joinpath(fname + "_beat%i_row.txt" % (kk)).resolve()
             saved_paths.append(file_path)
             np.savetxt(str(file_path), tracker_row_all[kk])
-            print("relaxed", tracker_row_all[0][0,0])
-            print("contracted", tracker_row_all[0][0,25])
             file_path = new_path.joinpath(fname + "_beat%i_col.txt" % (kk)).resolve()
             saved_paths.append(file_path)
             np.savetxt(str(file_path), tracker_col_all[kk])
@@ -503,7 +492,7 @@ def run_tracking(folder_path: Path, fps: int, length_scale: float) -> List:
     timeseries, _, _, _ = compute_abs_position_timeseries(tracker_0, tracker_1)
     info =  compute_valleys(timeseries)
     # test if frame 0 is a valley frame or not: warn the user
-    test_frame_0_valley(timeseries, info)
+    # test_frame_0_valley(timeseries, info)
     # split tracking results
     tracker_0_all, tracker_1_all = split_tracking(tracker_0, tracker_1, info)
     # compute beat frequency and amplitude
@@ -672,9 +661,6 @@ def create_pngs(
             jj = kk - start_idx
             
             if output == 'abs':
-                if(jj == 25):
-                    print("optical flow col", tracker_col[:, jj])
-
                 # plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_all[:, jj], s=10, cmap=col_map, vmin=0, vmax=col_max)
                 plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_all[:, jj], s=4, cmap=col_map, vmin=col_min, vmax=col_max)
                 if include_interp:
