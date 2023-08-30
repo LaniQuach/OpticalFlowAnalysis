@@ -72,14 +72,14 @@ elif track_mode == "tissue":
     method = "minimum"
     # ctm.run_create_tissue_mask(input_folder, seg_fcn_num, fname, frame_num, method)
    
-    elastixDisp_x = np.loadtxt('files/files_elastix/xdir_elastixDisp.txt')
-    elastix_x = [elastixDisp_x] #row
+    # elastixDisp_x = np.loadtxt('files/files_elastix/xdir_elastixDisp.txt')
+    # elastix_x = [elastixDisp_x] #row
 
-    elastixDisp_y = np.loadtxt('files/files_elastix/ydir_elastixDisp.txt')
-    elastix_y = [elastixDisp_y] #col
+    # elastixDisp_y = np.loadtxt('files/files_elastix/ydir_elastixDisp.txt')
+    # elastix_y = [elastixDisp_y] #col
 
     # run the tracking
-    ia.run_tracking(input_folder,fps,ls)
+    # ia.run_tracking(input_folder,fps,ls)
     
     # # # # run the tracking visualization
     automatic_color_constraint = True # Put False if manual limits are to be specified
@@ -126,13 +126,13 @@ elif track_mode == "tissue":
     fname = "elastix_"
     manual_sub = False # or True
     sub_extents = None # if manual_sub = True provide as [r0,r1,c0,c1]
-    sa.run_sub_domain_strain_analysis(input_folder, pillar_clip_fraction, shrink_row, shrink_col, tile_dim_pix, num_tile_row, num_tile_col, tile_style, is_rotated = False,clip_columns=clip_columns,clip_rows=clip_rows, manual_sub=manual_sub, sub_extents=sub_extents, save_fname= fname)
+    # sa.run_sub_domain_strain_analysis(input_folder, pillar_clip_fraction, shrink_row, shrink_col, tile_dim_pix, num_tile_row, num_tile_col, tile_style, is_rotated = False,clip_columns=clip_columns,clip_rows=clip_rows, manual_sub=manual_sub, sub_extents=sub_extents, save_fname= fname)
     
     # visualize the strain analysis results
     col_min = -0.025
     col_max = 0.025
     col_map = plt.cm.RdBu
-    sa.visualize_sub_domain_strain(input_folder, automatic_color_constraint, col_min, col_max, col_map, is_rotated = False)    
+    # sa.visualize_sub_domain_strain(input_folder, automatic_color_constraint, col_min, col_max, col_map, is_rotated = False)    
 
 else:
     print("track_mode should be either 'pillar' or 'tissue'")

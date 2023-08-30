@@ -705,6 +705,7 @@ def create_pngs(
             plt.axis("off")
             path = pngs_folder_path.joinpath(fn).resolve()
             plt.savefig(str(path))
+            print("image saved", path)
             if save_eps:
                 plt.savefig(str(path)[0:-4]+'.eps', format='eps')
             plt.close()
@@ -754,6 +755,8 @@ def run_visualization(folder_path: Path, automatic_color_constraint: bool = True
    
     elastixDisp_y = np.loadtxt('files/files_elastix/ydir_elastixDisp.txt')
     elastix_y = [elastixDisp_y]
+    
+    print(elastix_x[0][0,1])
     
     movie_folder_path = folder_path.joinpath("movie").resolve()
     name_list_path = image_folder_to_path_list(movie_folder_path)

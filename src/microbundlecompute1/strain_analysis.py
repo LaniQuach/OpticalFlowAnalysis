@@ -119,7 +119,7 @@ def compute_Lambda_from_pts(row_pos: np.ndarray, col_pos: np.ndarray) -> np.ndar
     num_pts = row_pos.shape[0]
     pts_row_col = np.array([row_pos,col_pos])
     ii, jj = np.triu_indices(num_pts, k=1)
-    Lambda_mat = pts_row_col[:,ii] - pts_row_col[:,jj]
+    Lambda_mat = pts_row_col[:,ii] - pts_row_col[:,jj] 
     return Lambda_mat
 
 
@@ -396,7 +396,7 @@ def png_sub_domain_strain_timeseries_all(
             for rr in range(0, num_sd_row):
                 lab = get_text_str(rr, cc)
                 idx = rr * num_sd_col + cc
-                ax.plot(sub_domain_strain[idx, :-10], label=lab, color=col_map(idx/(num_sd_col * num_sd_row)), vmin = -0.07, vmax = 0.01)
+                ax.plot(sub_domain_strain[idx, :-10], label=lab, color=col_map(idx/(num_sd_col * num_sd_row)))
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_title("beat %i" % (kk))
