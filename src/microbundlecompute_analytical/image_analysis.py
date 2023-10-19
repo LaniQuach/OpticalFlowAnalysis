@@ -748,10 +748,10 @@ def run_visualization(folder_path: Path, automatic_color_constraint: bool = True
     """Given a folder path where tracking has already been run. Will save visualizations."""
     # read image files
     
-    elastixDisp_x = np.loadtxt('files/files_analytical/xdir_AnalyDisp.txt')
+    elastixDisp_x = np.loadtxt('files/files_elastix/xdir_ElastixDisp.txt')
     elastix_x = [elastixDisp_x]
 
-    elastixDisp_y = np.loadtxt('files/files_analytical/ydir_AnalyDisp.txt')
+    elastixDisp_y = np.loadtxt('files/files_elastix/ydir_ElastixDisp.txt')
     elastix_y = [elastixDisp_y]
     
     movie_folder_path = folder_path.joinpath("movie").resolve()

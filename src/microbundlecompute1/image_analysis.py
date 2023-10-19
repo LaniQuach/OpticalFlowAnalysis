@@ -258,7 +258,18 @@ def track_all_steps(img_list_uint8: List, mask: np.ndarray,feature_params: dict,
     """Given the image list in order, mask, feature parameters and tracking parameters. Will run tracking through the whole img list in order.
     Note that the returned order of tracked points will match order_list."""
     img_0 = img_list_uint8[0]
-    track_points = mask_to_track_points(img_0, mask, feature_params)
+    # ycoords = np.load('files/files_elastix/ycoords.npy')
+    # xcoords = np.load('files/files_elastix/xcoords.npy')
+    # # track_points = mask_to_track_points(img_0, mask, feature_params)
+    # track_points = np.zeros((num_track_pts, 1, 2))
+    # track_points[:, 0, 0] = xcoords[:]
+    # track_points[:, 0, 1] = ycoords[:]
+    
+    # print("og", xcoords[0:5])
+    # print("tack_points", track_points[0:5, 0, 0])
+    
+    track_points = np.load('tracking_points.npy')
+
     num_track_pts = track_points.shape[0]
     num_imgs = len(img_list_uint8)
     tracker_0 = np.zeros((num_track_pts, num_imgs))
@@ -334,13 +345,14 @@ def compute_valleys(timeseries: np.ndarray) -> np.ndarray:
     time_seg_params = get_time_segment_param_dicts()
     time_seg_params = adjust_time_seg_params(time_seg_params, timeseries)
     peaks, _ = find_peaks(timeseries, distance=time_seg_params["peakDist"], prominence=time_seg_params["prom"])
+    print("peaks", peaks)
     valleys = []
     for kk in range(0, len(peaks) - 1):
         valleys.append(int(0.5 * peaks[kk] + 0.5 * peaks[kk + 1]))
     info = []
-    for kk in range(0, len(valleys) - 1):
+    for kk in range(0, 1):
         # beat number, start index wrt movie, end index wrt movie
-        info.append([kk, valleys[kk], valleys[kk + 1]])
+        info.append([kk, 0, 42])
     return np.asarray(info)
 
 
@@ -354,8 +366,10 @@ def compute_peaks(timeseries: np.ndarray) -> np.ndarray:
 
 def compute_beat_frequency(info: np.ndarray, fps: int) -> float:
     """Given valleys and frames/sec (fps). Will compute the frequency of the beats."""
+    print("Info in function", info)
     num_beats = info.shape[0]
     valley_pairs = info.T[1:]
+    print(valley_pairs)
     if num_beats > 2:
         period_all = valley_pairs[1]-valley_pairs[0]
         period = np.mean(period_all[1:-1])
@@ -370,7 +384,7 @@ def compute_beat_amplitude(timeseries: np.ndarray, tracker_row_all: List, tracke
     all_beat_ampl = []
     num_beats = info.shape[0]
     peaks = compute_peaks(timeseries)
-    actual_peaks = peaks[1:-1]
+    actual_peaks = peaks
     for beat in range(0, num_beats):
         tracker_row = tracker_row_all[beat]
         tracker_col = tracker_col_all[beat]
@@ -491,6 +505,7 @@ def run_tracking(folder_path: Path, fps: int, length_scale: float) -> List:
     # perform timeseries segmentation
     timeseries, _, _, _ = compute_abs_position_timeseries(tracker_0, tracker_1)
     info =  compute_valleys(timeseries)
+    print("info", info)
     # test if frame 0 is a valley frame or not: warn the user
     # test_frame_0_valley(timeseries, info)
     # split tracking results
@@ -646,8 +661,14 @@ def create_pngs(
     num_beats = info.shape[0]
     for beat in range(0, num_beats):
         tracker_row = tracker_row_all[beat]
+        # print(tracker_row[0,0], tracker_row[0,25])
+        # print(tracker_row[15,0], tracker_row[15,25])
+
         tracker_col = tracker_col_all[beat]
         _, disp_all, disp_0_all, disp_1_all = compute_abs_position_timeseries(tracker_row, tracker_col)
+        # print(disp_all.shape)
+        # print(disp_all[0, 25])
+
         if include_interp:
             interp_tracker_row = interp_tracker_row_all[beat]
             interp_tracker_col = interp_tracker_col_all[beat]
@@ -662,7 +683,7 @@ def create_pngs(
             
             if output == 'abs':
                 # plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_all[:, jj], s=10, cmap=col_map, vmin=0, vmax=col_max)
-                plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_all[:, jj], s=4, cmap=col_map, vmin=col_min, vmax=col_max)
+                plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_all[:, jj], s=4, cmap=col_map, vmin=col_min, vmax=14)
                 if include_interp:
                     # plt.scatter(interp_tracker_col[:, jj], interp_tracker_row[:, jj], c=interp_disp_all[:, jj], s=7, cmap=col_map, vmin=0, vmax=col_max, linewidths=1, edgecolors=(0, 0, 0))
                     plt.scatter(interp_tracker_col[:, jj], interp_tracker_row[:, jj], c=interp_disp_all[:, jj], s=7, cmap=col_map, vmin=col_min, vmax=col_max, linewidths=0.5, edgecolors=(0, 0, 0))
@@ -671,7 +692,7 @@ def create_pngs(
                 cbar.set_label("absolute displacement (pixels)", rotation=270)
                 
             elif output == 'row':
-                plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_0_all[:, jj], s=4, cmap=col_map, vmin=col_min, vmax=col_max)
+                plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_0_all[:, jj], s=4, cmap=col_map, vmin=-12, vmax=12)
                 if include_interp:
                     plt.scatter(interp_tracker_col[:, jj], interp_tracker_row[:, jj], c=interp_disp_0_all[:, jj], s=7, cmap=col_map, vmin=col_min, vmax=col_max, linewidths=0.5, edgecolors=(0, 0, 0))
                 cbar = plt.colorbar()
@@ -679,7 +700,7 @@ def create_pngs(
                 cbar.set_label("row (vertical) displacement (pixels)", rotation=270)
                 
             elif output == 'col':
-                plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_1_all[:, jj], s=4, cmap=col_map, vmin=col_min, vmax=col_max)
+                plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=disp_1_all[:, jj], s=4, cmap=col_map, vmin=-10, vmax=14)
                 if include_interp:
                     plt.scatter(interp_tracker_col[:, jj], interp_tracker_row[:, jj], c=interp_disp_1_all[:, jj], s=7, cmap=col_map, vmin=col_min, vmax=col_max, linewidths=0.5, edgecolors=(0, 0, 0))
                 cbar = plt.colorbar()
@@ -738,6 +759,7 @@ def run_visualization(folder_path: Path, automatic_color_constraint: bool = True
     tiff_list = read_all_tiff(name_list_path)
     # read tracking results
     tracker_row_all, tracker_col_all, info, _ = load_tracking_results(folder_path=folder_path)
+    # print(tracker_row_all[0].shape)
     if automatic_color_constraint:
         # find limits of colormap
         col_min_abs, col_max_abs, col_min_row, col_max_row, col_min_col, col_max_col = compute_min_max_disp(tracker_row_all,tracker_col_all,info)

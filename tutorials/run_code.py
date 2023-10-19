@@ -103,8 +103,7 @@ elif track_mode == "tissue":
     tile_style = 1 # or 2
     manual_sub = False # or True
     sub_extents = None # if manual_sub = True provide as [r0,r1,c0,c1]
-    sa.run_sub_domain_strain_analysis(input_folder, pillar_clip_fraction, shrink_row, shrink_col, tile_dim_pix, num_tile_row, num_tile_col, tile_style, is_rotated = False,clip_columns=clip_columns,clip_rows=clip_rows, manual_sub=manual_sub, sub_extents=sub_extents)
-    
+    # sa.run_sub_domain_strain_analysis(input_folder, pillar_clip_fraction, shrink_row, shrink_col, tile_dim_pix, num_tile_row, num_tile_col, tile_style, is_rotated = False,clip_columns=clip_columns,clip_rows=clip_rows, manual_sub=manual_sub, sub_extents=sub_extents)
     # visualize the strain analysis results
     col_min = -0.025
     col_max = 0.025

@@ -72,14 +72,14 @@ elif track_mode == "tissue":
     method = "minimum"
     # ctm.run_create_tissue_mask(input_folder, seg_fcn_num, fname, frame_num, method)
    
-    analyDisp_x = np.loadtxt('files/files_analytical/xdir_AnalyDisp.txt')
+    analyDisp_x = np.loadtxt('files/files_elastix/xdir_ElastixDisp.txt')
     analytical_x = [analyDisp_x] #row
 
-    analyDisp_y = np.loadtxt('files/files_analytical/ydir_AnalyDisp.txt')
+    analyDisp_y = np.loadtxt('files/files_elastix/ydir_ElastixDisp.txt')
     analytical_y = [analyDisp_y] #col
     
     # run the tracking
-    ia.run_tracking(input_folder,fps,ls)
+    # ia.run_tracking(input_folder,fps,ls)
     
     # # # # run the tracking visualization
     automatic_color_constraint = True # Put False if manual limits are to be specified

@@ -36,24 +36,24 @@ def create_sub_domains(
     pillar_clip_fraction: float = 0.5,
     shrink_row: float = 0.1,
     shrink_col: float = 0.1,
-    tile_dim_pix: int = 40,
+    tile_dim_pix: int = 35,
     num_tile_row: int = 5,
     num_tile_col: int = 3,
     tile_style: int = 1,
     clip_columns: bool = True,
     clip_rows: bool = False,
-    manual_sub: bool = False,
-    sub_extents: List = None
+    manual_sub: bool = True,
+    sub_extents: List = [53, 195, 18, 397]
 ) -> List:
     """Given a mask and sub-domain parameters. Will return a list of sub-domains define by 4 box coordinates.
     tile_style = 1 will fit as many square tiles of the given tile_dim_pix size in a grid
     tyle_style = 2 will create a num_tile_row x num_tile_col sized grid and adjust the tile_dim_pix as need
     """
-    # clip pillars from the mask
+    # clip pillars from the maskS
     mask_removed_pillars = ia.remove_pillar_region(mask, pillar_clip_fraction,clip_columns, clip_rows)
 
-    if manual_sub:
-        r0_user, r1_user, c0_user, c1_user = sub_extents
+    if True:
+        r0_user, r1_user, c0_user, c1_user = [53, 195, 18, 397]
         user_box = ia.bound_to_box(r0_user, r1_user, c0_user, c1_user)
         first_mask = box_to_mask(mask_removed_pillars, user_box)
         first_box_mask = ia.mask_to_box(first_mask)
@@ -64,6 +64,7 @@ def create_sub_domains(
         box_mask = shrink_box(first_box_mask, shrink_row, shrink_col)
     # tile sub-domains
     r0, r1, c0, c1 = ia.box_to_bound(box_mask)
+
     if tile_style == 1:
         num_tile_row = int(np.floor((r1 - r0) / tile_dim_pix))
         num_tile_col = int(np.floor((c1 - c0) / tile_dim_pix))
@@ -122,14 +123,30 @@ def compute_Lambda_from_pts(row_pos: np.ndarray, col_pos: np.ndarray) -> np.ndar
     Lambda_mat = pts_row_col[:,ii] - pts_row_col[:,jj] 
     return Lambda_mat
 
+def compute_Lambda_from_newCentroid(row_pos: np.ndarray, col_pos: np.ndarray) -> np.ndarray:
+    num_pts = row_pos.shape[0]
+    # print("row pos" , row_pos.shape[1])
+    pts_row_col = np.array([row_pos,col_pos])
+    
+    avgRow = np.mean(row_pos)
+    avgCol = np.mean(col_pos)
+    ii, jj = np.triu_indices(num_pts, k=1)
+    # print ("ii", ii.shape)
+    # print("jj", jj.shape)
+    # print("ptsrowcol", pts_row_col.shape)
+    centroidMean = np.array([[avgRow] * np.prod(ii.shape), [avgCol] *  np.prod(ii.shape)])
+    # print("centroid mean", centroidMean[:,1])
+    # print("first", pts_row_col[:,1])
+    Lambda_mat = pts_row_col[:,ii] - centroidMean[:,ii]
+    return Lambda_mat
 
 def compute_sub_domain_strain(sd_tracker_row: np.ndarray, sd_tracker_col: np.ndarray) -> np.ndarray:
     """Given tracking point positions. Will return F at every frame with the first frame as the reference."""
     sd_F_list = []
     num_frames = sd_tracker_row.shape[1]
-    Lambda_0 = compute_Lambda_from_pts(sd_tracker_row[:, 0], sd_tracker_col[:, 0])
+    Lambda_0 = compute_Lambda_from_newCentroid(sd_tracker_row[:, 0], sd_tracker_col[:, 0])
     for kk in range(0, num_frames):
-        Lambda_t = compute_Lambda_from_pts(sd_tracker_row[:, kk], sd_tracker_col[:, kk])
+        Lambda_t = compute_Lambda_from_newCentroid(sd_tracker_row[:, kk], sd_tracker_col[:, kk])
         F = compute_F_from_Lambda_mat(Lambda_0, Lambda_t)
         sd_F_list.append(F.reshape((-1, 1)))
     sd_F_arr = np.asarray(sd_F_list)[:, :, 0]
@@ -171,6 +188,7 @@ def compute_sub_domain_position_strain_all(tracker_row_all: List, tracker_col_al
         for kk in range(0, num_beats):
             sd_tracker_row = sd_tracker_row_all[kk]
             sd_tracker_col = sd_tracker_col_all[kk]
+            # print(sd_tracker_row.shape)
             sd_F_array = compute_sub_domain_strain(sd_tracker_row, sd_tracker_col)
             F_list.append(sd_F_array)
             sd_row_kk, sd_col_kk = compute_sub_domain_position(sd_tracker_row, sd_tracker_col, sd_box)
@@ -396,7 +414,7 @@ def png_sub_domain_strain_timeseries_all(
             for rr in range(0, num_sd_row):
                 lab = get_text_str(rr, cc)
                 idx = rr * num_sd_col + cc
-                ax.plot(sub_domain_strain[idx, :-10], label=lab, color=col_map(idx/(num_sd_col * num_sd_row)))
+                ax.plot(sub_domain_strain[idx], label=lab, color=col_map(idx/(num_sd_col * num_sd_row)))
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_title("beat %i" % (kk))
@@ -409,6 +427,111 @@ def png_sub_domain_strain_timeseries_all(
         path_list.append(img_path)
     return path_list
 
+def png_sub_domain_strain_timeseries_all_altered(
+    folder_path: Path,
+    sub_domain_strain_all: List,
+    sub_domain_strain_analyt: List,
+    sub_domain_strain_elastix: List,
+    num_sd_row: int,
+    num_sd_col: int,
+    output: str,
+    col_map: object = plt.cm.rainbow,
+    *,
+    fname: str = "strain_timeseries_Ecc",
+    xlabel: str = "frame",
+    ylabel: str = "strain Ecc"
+) -> List:
+    """Given strain timeseries. Will plot all timeseries on the same axis."""
+    vis_folder_path = ia.create_folder(folder_path, "visualizations")
+    main_pngs_folder_path = ia.create_folder(vis_folder_path, "strain_pngs")
+    
+    if output == "Ecc":
+        pngs_folder_path = ia.create_folder(main_pngs_folder_path, "Ecc")
+    elif output == "Ecr":
+        pngs_folder_path = ia.create_folder(main_pngs_folder_path, "Ecr")  
+    elif output == "Err":
+        pngs_folder_path = ia.create_folder(main_pngs_folder_path, "Err")           
+    num_beats = len(sub_domain_strain_all)
+    path_list = []
+    sd_ecc_analyticalFinite = np.load("files/files_run_code/Subdomain_ECC_analytical_finite.npy")
+    
+    for kk in range(0, num_beats):
+        plt.figure()
+        # fig, axs = plt.subplots(2, 2, sharey = "all", figsize=[9, 9])
+     
+        # idx1 = 0 * num_sd_col + 3
+        # idx2 = 2 * num_sd_col + 4
+        # idx3 = 1 * num_sd_col + 2
+        # idx4 = 2 * num_sd_col + 6
+        
+        sub_domain_strain_OF = sub_domain_strain_all[kk]
+        sub_domain_strain_OF = sub_domain_strain_OF[:, :-1]
+        sub_domain_strain_Analytical = sub_domain_strain_analyt[kk]
+        sub_domain_strain_Analytical = sub_domain_strain_Analytical[:, 2:-10]
+        sub_domain_strain_Elastix = sub_domain_strain_elastix[kk]
+        sub_domain_strain_Elastix = sub_domain_strain_Elastix[:, 1:-10]
+        sd_ecc_analyticalFinite = sd_ecc_analyticalFinite[:, 1:-10]
+
+        
+        print(sub_domain_strain_Analytical[20,10])
+        # print("OF", sub_domain_strain_OF.shape)
+        # print("analyt", sub_domain_strain_Analytical.shape)
+        # print("elastix", sub_domain_strain_Elastix.shape)
+        
+        fig, axs = plt.subplots(3, 8, sharex=True, sharey=True, num=1, clear=True)
+        for i in range(len(sub_domain_strain_OF)):
+            r, c = np.unravel_index(i, (3,8))
+            axs[r,c].plot(sub_domain_strain_OF[i], 'b:', linewidth = 0.5, label = "Optical Flow")
+            axs[r,c].plot(sub_domain_strain_Analytical[i], 'r-', linewidth = 0.5, label = "Analytical")
+            axs[r,c].plot(sub_domain_strain_Elastix[i], 'c--', linewidth = 0.5,label = "Elastix" )
+            axs[r,c].plot(sd_ecc_analyticalFinite[i], 'm-.', linewidth = 0.5, label = "Analytical Finite")
+
+        # axs[0, 0].plot(sub_domain_strain_OF[idx1, :-1], label="Optical Flow", color=col_map(idx1/(num_sd_col * num_sd_row)), linestyle='dotted')
+        # axs[0, 0].plot(sub_domain_strain_Analytical[idx1, 2:-10], label="Analytical", color=col_map(idx2/(num_sd_col * num_sd_row)))
+        # axs[0, 0].plot(sub_domain_strain_Elastix[idx1, 1:-10], label="Elastix", color=col_map(idx3/(num_sd_col * num_sd_row)), ls='--')
+        # axs[0, 0].plot(sd_ecc_analyticalFinite[idx1, 1:-10], label="Analytical Finite", color=col_map(idx4/(num_sd_col * num_sd_row)), ls='-.')
+
+        # axs[0, 0].set_xlabel(xlabel)
+        # axs[0, 0].set_ylabel(ylabel)
+        # axs[0, 0].set_title("a4")
+        # #########################
+        # axs[0, 1].plot(sub_domain_strain_OF[idx2, :], color=col_map(idx1/(num_sd_col * num_sd_row)), linestyle='dotted')
+        # axs[0, 1].plot(sub_domain_strain_Analytical[idx2, 2:-10], color=col_map(idx2/(num_sd_col * num_sd_row)))
+        # axs[0, 1].plot(sub_domain_strain_Elastix[idx2, 1:-10], color=col_map(idx3/(num_sd_col * num_sd_row)), ls='--')
+        # axs[0, 1].plot(sd_ecc_analyticalFinite[idx2, 1:-10], color=col_map(idx4/(num_sd_col * num_sd_row)), ls='-.')
+
+        
+        # axs[0, 1].set_xlabel(xlabel)
+        # axs[0, 1].set_ylabel(ylabel)
+        # axs[0, 1].set_title("c5")
+        # #######################
+        # axs[1, 0].plot(sub_domain_strain_OF[idx3, :-1], color=col_map(idx1/(num_sd_col * num_sd_row)), linestyle='dotted')
+        # axs[1, 0].plot(sub_domain_strain_Analytical[idx3, 2:-10],color=col_map(idx2/(num_sd_col * num_sd_row)))
+        # axs[1, 0].plot(sub_domain_strain_Elastix[idx3, 1:-10], color=col_map(idx3/(num_sd_col * num_sd_row)), ls='--')
+        # axs[1, 0].plot(sd_ecc_analyticalFinite[idx3, 1:-10], color=col_map(idx4/(num_sd_col * num_sd_row)), ls='-.')
+
+        # axs[1, 0].set_xlabel(xlabel)
+        # axs[1, 0].set_ylabel(ylabel)
+        # axs[1, 0].set_title("b3")
+        # ###############################
+        # axs[1, 1].plot(sub_domain_strain_OF[idx4, :-1], color=col_map(idx1/(num_sd_col * num_sd_row)), linestyle='dotted')
+        # axs[1, 1].plot(sub_domain_strain_Analytical[idx4, 2:-10], color=col_map(idx2/(num_sd_col * num_sd_row)))
+        # axs[1, 1].plot(sub_domain_strain_Elastix[idx4, 1:-10], color=col_map(idx3/(num_sd_col * num_sd_row)), ls='--')
+        # axs[1, 1].plot(sd_ecc_analyticalFinite[idx4, 1:-10], color=col_map(idx4/(num_sd_col * num_sd_row)), ls='-.')
+
+        # axs[1, 1].set_xlabel(xlabel)
+        # axs[1, 1].set_ylabel(ylabel)
+        # axs[1, 1].set_title("c7")
+        # # box = axs[0, 0].get_position()
+        # # axs[0, 0].set_position([box.x0, box.y0 + box.height * 0.25, box.width, box.height * 0.75])
+        # ax.legend(loc='upper center', ncol=num_sd_col)
+        handles, labels = axs.get_legend_handles_labels()
+        fig.legend(handles, labels, bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)        
+        img_path = pngs_folder_path.joinpath(fname + "_beat%i.png" % (kk)).resolve()
+        plt.savefig(str(img_path), format='png', dpi = 180)
+        plt.close()
+        path_list.append(img_path)
+    return path_list
 
 def compute_min_max_strain (
     sub_domain_E_all,
@@ -468,7 +591,7 @@ def pngs_sub_domain_strain(
             plt.figure()
             plt.imshow(tiff_list[kk], cmap=plt.cm.gray)
             jj = kk - start_idx
-            plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=E[:, jj], s=50, cmap=col_map, vmin=col_min, vmax=col_max)
+            plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=E[:, jj], s=50, cmap=col_map, vmin=-0.09, vmax=0.0)
             # illustrate sub-domain borders
             sds = sub_domain_side / 2.0
             for ii in range(0, tracker_col.shape[0]):
@@ -489,6 +612,71 @@ def pngs_sub_domain_strain(
             path_list.append(path)
     return path_list
 
+
+def pngs_sub_domain_error(
+    folder_path: Path,
+    tiff_list: List,
+    sub_domain_row_all: List,
+    sub_domain_col_all: List,
+    sub_domain_E_all: List,
+    sub_domain_side: Union[float, int],
+    info: np.ndarray,
+    output: str,
+    col_min: Union[float, int] = -0.025,
+    col_max: Union[float, int] = 0.025,
+    col_map: object = plt.cm.RdBu,
+    fname: str = "strain",
+    save_eps: bool = False
+) -> List:
+    """Given sub domain strain results. Will create pngs."""
+    vis_folder_path = ia.create_folder(folder_path, "visualizations")
+    main_pngs_folder_path = ia.create_folder(vis_folder_path, "strain_pngs")
+    
+    if output == "Ecc":
+        pngs_folder_path = ia.create_folder(main_pngs_folder_path, "Ecc")
+        E_label = "Ecc"
+    elif output == "Ecr":
+        pngs_folder_path = ia.create_folder(main_pngs_folder_path, "Ecr")  
+        E_label = "Ecr"
+    elif output == "Err":
+        pngs_folder_path = ia.create_folder(main_pngs_folder_path, "Err") 
+        E_label = "Err"
+        
+    path_list = []
+    num_beats = info.shape[0]
+    for beat in range(0, num_beats):
+        tracker_row = sub_domain_row_all[beat]
+        tracker_col = sub_domain_col_all[beat]
+        E = sub_domain_E_all
+        start_idx = 25
+        end_idx = 26
+        for kk in range(start_idx, end_idx):
+            ax = plt.figure()
+            # ax.text(5,10, "Average Error: %d" % np.mean(E), verticalalignment='center')
+            # print(E)
+            print(E_label, np.mean(np.abs(E)))
+            plt.imshow(tiff_list[kk], cmap=plt.cm.gray)
+            jj = kk
+            plt.scatter(tracker_col[:, jj], tracker_row[:, jj], c=E[:], s=50, cmap=col_map, vmin = -0.2, vmax = 0.2)
+            # illustrate sub-domain borders
+            sds = sub_domain_side / 2.0
+            for ii in range(0, tracker_col.shape[0]):
+                corners_rr = [tracker_row[ii, jj] - sds, tracker_row[ii, jj] - sds, tracker_row[ii, jj] + sds, tracker_row[ii, jj] + sds, tracker_row[ii, jj] - sds]
+                corners_cc = [tracker_col[ii, jj] - sds, tracker_col[ii, jj] + sds, tracker_col[ii, jj] + sds, tracker_col[ii, jj] - sds, tracker_col[ii, jj] - sds]
+                plt.plot(corners_cc, corners_rr, "k-", linewidth=0.1)
+                
+            plt.title("frame %i, beat %i, %s" % (kk, beat, E_label))
+            cbar = plt.colorbar()
+            cbar.ax.get_yaxis().labelpad = 15
+            cbar.set_label("%s error (image column axis)"%(E_label), rotation=270)
+            plt.axis("off")
+            path = pngs_folder_path.joinpath("%04d_" % (kk) + fname + ".png").resolve()
+            plt.savefig(str(path), dpi = 180)
+            if save_eps:
+                plt.savefig(str(path)[0:-4]+'.eps',format='eps')
+            plt.close()
+            path_list.append(path)
+    return path_list
 
 def create_gif(folder_path: Path, png_path_list: List, fname="sub_domain_strain") -> Path:
     """Given the pngs path list. Will create a gif."""
@@ -556,21 +744,32 @@ def run_sub_domain_strain_analysis(
             rot_mask = mask
             rot_tracker_row_all_pad, rot_tracker_col_all_pad = tracker_row_all, tracker_col_all
         # create sub-domains
-        sub_domain_box_list, tile_dim_pix, num_tile_row, num_tile_col = create_sub_domains(rot_mask, pillar_clip_fraction=pillar_clip_fraction, shrink_row=shrink_row, shrink_col=shrink_col, tile_dim_pix=tile_dim_pix, num_tile_row=num_tile_row, num_tile_col=num_tile_col, tile_style=tile_style,clip_columns=clip_columns,clip_rows=clip_rows,manual_sub= manual_sub,sub_extents=sub_extents) 
+        sub_domain_box_list, tile_dim_pix, num_tile_row, num_tile_col = create_sub_domains(rot_mask, pillar_clip_fraction=pillar_clip_fraction, shrink_row=shrink_row, shrink_col=shrink_col, tile_dim_pix=tile_dim_pix, num_tile_row=num_tile_row, num_tile_col=num_tile_col, tile_style=tile_style,clip_columns=clip_columns,clip_rows=clip_rows,manual_sub= manual_sub,sub_extents=sub_extents)
+        np.save("subdomainBoxes.npy", sub_domain_box_list)
+        # print(len(sub_domain_box_list))
+
         # compute strain in each sub-domain
-        sub_domain_F_all, sub_domain_row_all, sub_domain_col_all = compute_sub_domain_position_strain_all(rot_tracker_row_all_pad, rot_tracker_col_all_pad, sub_domain_box_list) 
+        # sub_domain_F_all, sub_domain_row_all, sub_domain_col_all = compute_sub_domain_position_strain_all(rot_tracker_row_all_pad, rot_tracker_col_all_pad, sub_domain_box_list) 
         # save the sub-domain strains
-        strain_sub_domain_info = np.asarray([[num_tile_row, num_tile_col], [tile_dim_pix, tile_dim_pix], [center_row, center_col], [vec[0], vec[1]]])
+        # strain_sub_domain_info = np.asarray([[num_tile_row, num_tile_col], [tile_dim_pix, tile_dim_pix], [center_row, center_col], [vec[0], vec[1]]])
     else:
         # create sub-domains
         sub_domain_box_list, tile_dim_pix, num_tile_row, num_tile_col = create_sub_domains(mask, pillar_clip_fraction=pillar_clip_fraction, shrink_row=shrink_row, shrink_col=shrink_col, tile_dim_pix=tile_dim_pix, num_tile_row=num_tile_row, num_tile_col=num_tile_col, tile_style=tile_style,clip_columns=clip_columns,clip_rows=clip_rows,manual_sub= manual_sub,sub_extents=sub_extents)
+        np.save("subdomainBoxes.npy", sub_domain_box_list)
+
+        # print(len(sub_domain_box_list))
+        # print(sub_domain_box_list[0].shape)
+
+
         # compute strain in each sub-domain
-        sub_domain_F_all, sub_domain_row_all, sub_domain_col_all = compute_sub_domain_position_strain_all(tracker_row_all, tracker_col_all, sub_domain_box_list)
+        # print(tracker_row_all[0].shape)
+        # print(sub_domain_box_list)
+        # sub_domain_F_all, sub_domain_row_all, sub_domain_col_all = compute_sub_domain_position_strain_all(tracker_row_all, tracker_col_all, sub_domain_box_list)
         # save the sub-domain strains
-        strain_sub_domain_info = np.asarray([[num_tile_row, num_tile_col], [tile_dim_pix, tile_dim_pix]])
+        # strain_sub_domain_info = np.asarray([[num_tile_row, num_tile_col], [tile_dim_pix, tile_dim_pix]])
    
-    saved_paths = save_sub_domain_strain(folder_path, sub_domain_F_all, sub_domain_row_all, sub_domain_col_all, strain_sub_domain_info, fname=save_fname)
-    return saved_paths
+    # saved_paths = save_sub_domain_strain(folder_path, sub_domain_F_all, sub_domain_row_all, sub_domain_col_all, strain_sub_domain_info, fname=save_fname)
+    # return saved_paths
 
 
 def visualize_sub_domain_strain(
@@ -614,30 +813,85 @@ def visualize_sub_domain_strain(
                 tiff_list = ia.rotate_imgs_all(tiff_list, ang, center_row, center_col)
         else:
             tiff_list = tiff_list
-
+            
+    maxFrame = 24;
     # convert the strain results to Ecc for plotting
     sub_domain_Ecc_all, sub_domain_Ecr_all, sub_domain_Err_all = F_to_E_all(sub_domain_F_rr_all, sub_domain_F_rc_all, sub_domain_F_cr_all, sub_domain_F_cc_all)
+    
+####### SAVE STRAIN FROM ELSEWHERE ##########################################################################
+#Dont need to edit anything here
+    # np.save("files/files_run_code/Subdomain_ECC_elastix", sub_domain_Ecc_all)
+    # np.save("files/files_run_code/Subdomain_ECR_elastix", sub_domain_Ecr_all)
+    # np.save("files/files_run_code/Subdomain_ERR_elastix", sub_domain_Err_all)
+    
+    # np.save("files/files_run_code/Subdomain_ECC_analytical", sub_domain_Ecc_all)
+    # np.save("files/files_run_code/Subdomain_ECR_analytical", sub_domain_Ecr_all)
+    # np.save("files/files_run_code/Subdomain_ERR_analytical", sub_domain_Err_all)
+
+
+######### LOAD STRAIN ########################################################################################
+    sd_ecc_elastix = np.load("files/files_run_code/Subdomain_ECC_elastix.npy")
+    sd_ecr_elastix = np.load("files/files_run_code/Subdomain_ECR_elastix.npy")
+    sd_err_elastix = np.load("files/files_run_code/Subdomain_ERR_elastix.npy")
+
+    sd_ecc_analytical = np.load("files/files_run_code/Subdomain_ECC_analytical.npy")
+    sd_ecr_analytical = np.load("files/files_run_code/Subdomain_ECR_analytical.npy")
+    sd_err_analytical = np.load("files/files_run_code/Subdomain_ERR_analytical.npy")
+
+###### REGULAR VISUALIZATION ############################################################################################
     if automatic_color_constraint:
         # find limits of colormap
         clim_Ecc_min, clim_Ecc_max = compute_min_max_strain(sub_domain_Ecc_all,info)
         clim_Ecr_min, clim_Ecr_max = compute_min_max_strain(sub_domain_Ecr_all,info)
         clim_Err_min, clim_Err_max = compute_min_max_strain(sub_domain_Err_all,info)
-    # create png visualizations
-    png_path_list_Ecc = pngs_sub_domain_strain(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, sub_domain_Ecc_all, sub_domain_side, info, "Ecc", clim_Ecc_min, clim_Ecc_max, col_map, fname, save_eps=False)
-    png_path_list_Ecr = pngs_sub_domain_strain(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, sub_domain_Ecr_all, sub_domain_side, info, "Ecr", clim_Ecr_min, clim_Ecr_max, col_map, fname, save_eps=False)
-    png_path_list_Err = pngs_sub_domain_strain(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, sub_domain_Err_all, sub_domain_side, info, "Err", clim_Err_min, clim_Err_max, col_map, fname, save_eps=False)    
-    # create gif
-    gif_path_Ecc = create_gif(folder_path, png_path_list_Ecc, fname="sub_domain_strain_Ecc")
-    gif_path_Ecr = create_gif(folder_path, png_path_list_Ecr, fname="sub_domain_strain_Ecr")
-    gif_path_Err = create_gif(folder_path, png_path_list_Err, fname="sub_domain_strain_Err")
-    # create subdomain locations legend
-    loc_legend_path = png_sub_domains_numbered(folder_path, tiff_list[0], sub_domain_row_all[0], sub_domain_col_all[0], sub_domain_side, num_sd_row, num_sd_col)
-    # create subdomain strain timeseries plots
-    timeseries_path_list_Ecc = png_sub_domain_strain_timeseries_all(folder_path, sub_domain_Ecc_all, num_sd_row, num_sd_col, output="Ecc", fname="strain_timeseries_Ecc", ylabel="strain Ecc")
-    timeseries_path_list_Ecr = png_sub_domain_strain_timeseries_all(folder_path, sub_domain_Ecr_all, num_sd_row, num_sd_col, output="Ecr", fname="strain_timeseries_Ecr", ylabel="strain Ecr")
-    timeseries_path_list_Err = png_sub_domain_strain_timeseries_all(folder_path, sub_domain_Err_all, num_sd_row, num_sd_col, output="Err", fname="strain_timeseries_Err", ylabel="strain Err")
-    return png_path_list_Ecc, png_path_list_Ecr, png_path_list_Err, gif_path_Ecc, gif_path_Ecr, gif_path_Err, loc_legend_path, timeseries_path_list_Ecc, timeseries_path_list_Ecr, timeseries_path_list_Err
+        
+    # png_path_list_Ecc = pngs_sub_domain_strain(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, sub_domain_Ecc_all, sub_domain_side, info, "Ecc", clim_Ecc_min, clim_Ecc_max, col_map, fname, save_eps=False)
+    # png_path_list_Ecr = pngs_sub_domain_strain(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, sub_domain_Ecr_all, sub_domain_side, info, "Ecr", clim_Ecr_min, clim_Ecr_max, col_map, fname, save_eps=False)
+    # png_path_list_Err = pngs_sub_domain_strain(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, sub_domain_Err_all, sub_domain_side, info, "Err", clim_Err_min, clim_Err_max, col_map, fname, save_eps=False)    
+    
+    # # create gif
+    # gif_path_Ecc = create_gif(folder_path, png_path_list_Ecc, fname="sub_domain_strain_Ecc")
+    # gif_path_Ecr = create_gif(folder_path, png_path_list_Ecr, fname="sub_domain_strain_Ecr")
+    # gif_path_Err = create_gif(folder_path, png_path_list_Err, fname="sub_domain_strain_Err")
+    
+    # # create subdomain locations legend
+    # loc_legend_path = png_sub_domains_numbered(folder_path, tiff_list[0], sub_domain_row_all[0], sub_domain_col_all[0], sub_domain_side, num_sd_row, num_sd_col)
+    
+    # # create subdomain strain timeseries plots edited
+    timeseries_path_list_Ecc = png_sub_domain_strain_timeseries_all_altered(folder_path, sub_domain_Ecc_all, sd_ecc_analytical, sd_ecc_elastix, num_sd_row, num_sd_col, output="Ecc", fname="strain_timeseries_Ecc", ylabel="strain Ecc")
+    timeseries_path_list_Ecr = png_sub_domain_strain_timeseries_all_altered(folder_path, sub_domain_Ecr_all, sd_ecr_analytical, sd_ecr_elastix, num_sd_row, num_sd_col, output="Ecr", fname="strain_timeseries_Ecr", ylabel="strain Ecr")
+    timeseries_path_list_Err = png_sub_domain_strain_timeseries_all_altered(folder_path, sub_domain_Err_all, sd_err_analytical, sd_err_elastix, num_sd_row, num_sd_col, output="Err", fname="strain_timeseries_Err", ylabel="strain Err")
 
- 
+    # # Regular time series plots
+    # timeseries_path_list_Ecc = png_sub_domain_strain_timeseries_all(folder_path, sub_domain_Ecc_all, num_sd_row, num_sd_col, output="Ecc", fname="strain_timeseries_Ecc", ylabel="strain Ecc")
+    # timeseries_path_list_Ecr = png_sub_domain_strain_timeseries_all(folder_path, sub_domain_Ecr_all, num_sd_row, num_sd_col, output="Ecr", fname="strain_timeseries_Ecr", ylabel="strain Ecr")
+    # timeseries_path_list_Err = png_sub_domain_strain_timeseries_all(folder_path, sub_domain_Err_all, num_sd_row, num_sd_col, output="Err", fname="strain_timeseries_Err", ylabel="strain Err")
+
+
+###### ERROR CALC AND VISUALIZATION BELOW #####################################################################################
+    
+    # Elastix error
+    # elastix_error_ecc = (sd_ecc_elastix[0][:,maxFrame] - sd_ecc_analytical[0][:,maxFrame])/sd_ecc_analytical[0][:,maxFrame]
+    # elastix_error_ecr = (sd_ecr_elastix[0][:,maxFrame] - sd_ecr_analytical[0][:,maxFrame])/sd_ecr_analytical[0][:,maxFrame]
+    # elastix_error_err = (sd_err_elastix[0][:,maxFrame] - sd_err_analytical[0][:,maxFrame])/sd_err_analytical[0][:,maxFrame]
+    
+    # # Optical Flow error
+    # of_error_ecc = (sub_domain_Ecc_all[0][:,maxFrame] - sd_ecc_analytical[0][:,maxFrame])/sd_ecc_analytical[0][:,maxFrame]
+    # of_error_ecr = (sub_domain_Ecr_all[0][:,maxFrame] - sd_ecr_analytical[0][:,maxFrame])/sd_ecr_analytical[0][:,maxFrame]
+    # of_error_err = (sub_domain_Err_all[0][:,maxFrame] - sd_err_analytical[0][:,maxFrame])/sd_err_analytical[0][:,maxFrame]
+    
+     
+    # # Elastix visualization
+    # png_path_list_Ecc = pngs_sub_domain_error(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, elastix_error_ecc, sub_domain_side, info, "Ecc", clim_Ecc_min, clim_Ecc_max, col_map, fname = "Strain_error_elastix", save_eps=False)
+    # png_path_list_Ecr = pngs_sub_domain_error(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, elastix_error_ecr, sub_domain_side, info, "Ecr", clim_Ecr_min, clim_Ecr_max, col_map, fname = "Strain_error_elastix", save_eps=False)
+    # png_path_list_Err = pngs_sub_domain_error(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, elastix_error_err, sub_domain_side, info, "Err", clim_Err_min, clim_Err_max, col_map, fname = "Strain_error_elastix", save_eps=False)    
+
+    # # Optical Flow visualization
+    # png_path_list_Ecc = pngs_sub_domain_error(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, of_error_ecc, sub_domain_side, info, "Ecc", clim_Ecc_min, clim_Ecc_max, col_map, fname = "Strain_error_OF", save_eps=False)
+    # png_path_list_Ecr = pngs_sub_domain_error(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, of_error_ecr, sub_domain_side, info, "Ecr", clim_Ecr_min, clim_Ecr_max, col_map, fname = "Strain_error_OF", save_eps=False)
+    # png_path_list_Err = pngs_sub_domain_error(folder_path, tiff_list, sub_domain_row_all, sub_domain_col_all, of_error_err, sub_domain_side, info, "Err", clim_Err_min, clim_Err_max, col_map, fname = "Strain_error_OF", save_eps=False)    
+   
+    # return png_path_list_Ecc, png_path_list_Ecr, png_path_list_Err, gif_path_Ecc, gif_path_Ecr, gif_path_Err, loc_legend_path, timeseries_path_list_Ecc, timeseries_path_list_Ecr, timeseries_path_list_Err
+
 
 

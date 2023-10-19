@@ -36,14 +36,14 @@ def create_sub_domains(
     pillar_clip_fraction: float = 0.5,
     shrink_row: float = 0.1,
     shrink_col: float = 0.1,
-    tile_dim_pix: int = 40,
+    tile_dim_pix: int = 35,
     num_tile_row: int = 5,
     num_tile_col: int = 3,
     tile_style: int = 1,
     clip_columns: bool = True,
     clip_rows: bool = False,
-    manual_sub: bool = False,
-    sub_extents: List = None
+    manual_sub: bool = True,
+    sub_extents: List = [53, 195, 18, 397]
 ) -> List:
     """Given a mask and sub-domain parameters. Will return a list of sub-domains define by 4 box coordinates.
     tile_style = 1 will fit as many square tiles of the given tile_dim_pix size in a grid
@@ -52,8 +52,8 @@ def create_sub_domains(
     # clip pillars from the mask
     mask_removed_pillars = ia.remove_pillar_region(mask, pillar_clip_fraction,clip_columns, clip_rows)
 
-    if manual_sub:
-        r0_user, r1_user, c0_user, c1_user = sub_extents
+    if True:
+        r0_user, r1_user, c0_user, c1_user = [53, 195, 18, 397]
         user_box = ia.bound_to_box(r0_user, r1_user, c0_user, c1_user)
         first_mask = box_to_mask(mask_removed_pillars, user_box)
         first_box_mask = ia.mask_to_box(first_mask)
@@ -64,6 +64,7 @@ def create_sub_domains(
         box_mask = shrink_box(first_box_mask, shrink_row, shrink_col)
     # tile sub-domains
     r0, r1, c0, c1 = ia.box_to_bound(box_mask)
+
     if tile_style == 1:
         num_tile_row = int(np.floor((r1 - r0) / tile_dim_pix))
         num_tile_col = int(np.floor((c1 - c0) / tile_dim_pix))
@@ -121,6 +122,23 @@ def compute_Lambda_from_pts(row_pos: np.ndarray, col_pos: np.ndarray) -> np.ndar
     pts_row_col = np.array([row_pos,col_pos])
     ii, jj = np.triu_indices(num_pts, k=1)
     Lambda_mat = pts_row_col[:,ii] - pts_row_col[:,jj]
+    return Lambda_mat
+
+def compute_Lambda_from_newCentroid(row_pos: np.ndarray, col_pos: np.ndarray) -> np.ndarray:
+    num_pts = row_pos.shape[0]
+    # print("row pos" , row_pos.shape[1])
+    pts_row_col = np.array([row_pos,col_pos])
+    
+    avgRow = np.mean(row_pos)
+    avgCol = np.mean(col_pos)
+    ii, jj = np.triu_indices(num_pts, k=1)
+    print ("ii", ii.shape)
+    print("jj", jj.shape)
+    print("ptsrowcol", pts_row_col.shape)
+    centroidMean = np.array([[avgRow] * np.prod(ii.shape), [avgCol] *  np.prod(ii.shape)])
+    print("centroid mean", centroidMean[:,1])
+    print("first", pts_row_col[:,1])
+    Lambda_mat = pts_row_col[:,ii] - centroidMean[:,ii]
     return Lambda_mat
 
 
@@ -536,11 +554,12 @@ def run_sub_domain_strain_analysis(
     mask = ia.read_txt_as_mask(mask_file_path)
 
     # load tracking results
-    elastixDisp_x = np.loadtxt('files/insilico_test/xdir_elastixDisp.txt')
+    elastixDisp_x = np.loadtxt('files/files_elastix/xdir_elastixDisp.txt')
     elastix_x = [elastixDisp_x]
-
-    elastixDisp_y = np.loadtxt('files/insilico_test/ydir_elastixDisp.txt')
+   
+    elastixDisp_y = np.loadtxt('files/files_elastix/ydir_elastixDisp.txt')
     elastix_y = [elastixDisp_y]
+      
     
     # tracker_row_all, tracker_col_all, _, _ = ia.load_tracking_results(folder_path=folder_path, fname = 'elastix_')
     tracker_row_all = elastix_x
@@ -628,6 +647,10 @@ def visualize_sub_domain_strain(
 
     # convert the strain results to Ecc for plotting
     sub_domain_Ecc_all, sub_domain_Ecr_all, sub_domain_Err_all = F_to_E_all(sub_domain_F_rr_all, sub_domain_F_rc_all, sub_domain_F_cr_all, sub_domain_F_cc_all)
+    np.save("Subdomain_ECC_elastix", sub_domain_Ecc_all)
+    np.save("Subdomain_ECR_elastix", sub_domain_Ecr_all)
+    np.save("Subdomain_ERR_elastix", sub_domain_Err_all)
+    
     if automatic_color_constraint:
         # find limits of colormap
         clim_Ecc_min, clim_Ecc_max = compute_min_max_strain(sub_domain_Ecc_all,info)

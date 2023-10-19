@@ -124,12 +124,30 @@ def compute_Lambda_from_pts(row_pos: np.ndarray, col_pos: np.ndarray) -> np.ndar
     return Lambda_mat
 
 
+def compute_Lambda_from_newCentroid(row_pos: np.ndarray, col_pos: np.ndarray) -> np.ndarray:
+    num_pts = row_pos.shape[0]
+    # print("row pos" , row_pos.shape[1])
+    pts_row_col = np.array([row_pos,col_pos])
+
+    avgRow = np.mean(row_pos)
+    avgCol = np.mean(col_pos)
+    ii, jj = np.triu_indices(num_pts, k=1)
+    print ("ii", ii.shape)
+    print("jj", jj.shape)
+    print("ptsrowcol", pts_row_col.shape)
+    centroidMean = np.array([[avgRow] * np.prod(ii.shape), [avgCol] *  np.prod(ii.shape)])
+    print("centroid mean", centroidMean[:,1])
+    print("first", pts_row_col[:,1])
+    Lambda_mat = pts_row_col[:,ii] - centroidMean[:,ii]
+    return Lambda_mat
+
+
 def compute_sub_domain_strain(sd_tracker_row: np.ndarray, sd_tracker_col: np.ndarray) -> np.ndarray:
     """Given tracking point positions. Will return F at every frame with the first frame as the reference."""
     sd_F_list = []
-    Lambda_0 = compute_Lambda_from_pts(sd_tracker_row[:, 0], sd_tracker_col[:, 0])
+    Lambda_0 = compute_Lambda_from_newCentroid(sd_tracker_row[:, 0], sd_tracker_col[:, 0])
     for kk in range(0, 2):
-        Lambda_t = compute_Lambda_from_pts(sd_tracker_row[:, kk], sd_tracker_col[:, kk])
+        Lambda_t = compute_Lambda_from_newCentroid(sd_tracker_row[:, kk], sd_tracker_col[:, kk])
         F = compute_F_from_Lambda_mat(Lambda_0, Lambda_t)
         sd_F_list.append(F.reshape((-1, 1)))
     sd_F_arr = np.asarray(sd_F_list)[:, :, 0]
@@ -626,6 +644,10 @@ def visualize_sub_domain_strain(
 
     # convert the strain results to Ecc for plotting
     sub_domain_Ecc_all, sub_domain_Ecr_all, sub_domain_Err_all = F_to_E_all(sub_domain_F_rr_all, sub_domain_F_rc_all, sub_domain_F_cr_all, sub_domain_F_cc_all)
+    np.savetxt("files/files_analy_full/Subdomain_ECC_analytical.txt", sub_domain_Ecc_all)
+    np.savetxt("files/files_analy_full/Subdomain_ECR_analytical", sub_domain_Ecr_all)
+    np.savetxt("files/files_analy_full/Subdomain_ERR_analytical", sub_domain_Err_all)
+    
     if automatic_color_constraint:
         # find limits of colormap
         clim_Ecc_min, clim_Ecc_max = compute_min_max_strain(sub_domain_Ecc_all,info)

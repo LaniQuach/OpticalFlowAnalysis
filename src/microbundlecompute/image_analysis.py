@@ -705,7 +705,7 @@ def create_pngs(
             plt.axis("off")
             path = pngs_folder_path.joinpath(fn).resolve()
             plt.savefig(str(path))
-            print("image saved", path)
+            # print("image saved", path)
             if save_eps:
                 plt.savefig(str(path)[0:-4]+'.eps', format='eps')
             plt.close()
